@@ -1,4 +1,4 @@
-/*--------------------------------------------------------------------------------------
+/*--------------------------------------------------------------------------------------------
 
   Snake Display Module for Ardiuno Due and Adafruit SSD1306 128x64 LCD screen.
 
@@ -7,7 +7,7 @@
 
   Uses Adafruit graphics and SSD1306 drivers.
       https://github.com/adafruit/Adafruit_SSD1306
-  --------------------------------------------------------------------------------------
+  --------------------------------------------------------------------------------------------
 
   The display is pixel controlled with the game board area divided into spaces. The game board
   is surrounded by a one pixel thick rectangle with the player score to the right of the game
@@ -22,43 +22,43 @@
     X X I
 
   The O symbols above signify the main space of the square, the X symbols are the connecting
-  pixels which can visually connect two spaces, and the I symbol is an unused pixel. Each space
-  must have these padding X and I symbols on all sides, so an additional row and column of these
-  are placed on the top and left of the game board.
+  pixels which can visually connect two spaces, and the I symbol is an unused pixel. Each
+  space must have these padding X and I symbols on all sides, so an additional row and column
+  of these are placed on the top and left of the game board.
 
   The rectangle surrounding the game board is spaced one pixel from top, left and bottom with
-  a larger space on the right to accomodate the player score. The rectangle also has a one pixel
-  thick buffer between it and the start of the game board.
+  a larger space on the right to accomodate the player score. The rectangle also has a one
+  pixel thick buffer between it and the start of the game board.
 
-  The player score to the right of the game board is represented by a two digit number and printed
-  at size 1 (each character 5 pixels wide by 7 high).
+  The player score to the right of the game board is represented by a two digit number and
+  printed at size 1 (each character 5 pixels wide by 7 high).
     
-  --------------------------------------------------------------------------------------
+  --------------------------------------------------------------------------------------------
 
   When each space is drawn by calling display_draw_new(), the direction in which the snake is
   travelling can also be passed. The module will then draw the two pixels between the current
   space and the previous space to connect spaces and show the path of the snake.
 
   When each space is erased, the surrounding connecting pixels which may have been drawn will
-  also need to be cleared. This is done by drawing a 4x4 black filled rectangle over the space
-  and it's surrounding pixels clearing all connecting pixels.
+  also need to be cleared. This is done by drawing a 4x4 black filled rectangle over the
+  space and it's surrounding pixels clearing all connecting pixels.
   
-  --------------------------------------------------------------------------------------*/
+  ------------------------------------------------------------------------------------------*/
 
 
-/*--------------------------------------------------------------------------------------
+/*--------------------------------------------------------------------------------------------
   Includes
-  --------------------------------------------------------------------------------------*/
+  ------------------------------------------------------------------------------------------*/
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
 
-/*--------------------------------------------------------------------------------------
+/*--------------------------------------------------------------------------------------------
   Defines
-  --------------------------------------------------------------------------------------*/
-// If using software SPI (the default case):
+  ------------------------------------------------------------------------------------------*/
+// Define SPI pins:
 #define OLED_MOSI   9
 #define OLED_CLK   10
 #define OLED_DC    11
@@ -66,12 +66,36 @@
 #define OLED_RESET 13
 Adafruit_SSD1306 display(OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 
+// Locations for player Score relative to the top-left corner of screen
+#define SCORE_LOCATION_X 115
+#define SCORE_LOCATION_Y 5
+#define HEX_ASCII_OFFSET 0x30
+#define SCORE_WIDTH 11
+#define SCORE_HEIGHT 7
 
-/*--------------------------------------------------------------------------------------
+// Inputted player direction is printed below player score
+#define DIRECTION_LOCATION_X 115
+#define DIRECTION_LOCATION_Y 20
+#define DIRECTION_WIDTH 10
+#define DIRECTION_HEIGHT 14
+
+// LCD display has built in directional arrow characters at set ASCII character locations
+#define CHARACTER_ARROW_LEFT 27
+#define CHARACTER_ARROW_RIGHT 26
+#define CHARACTER_ARROW_UP 24
+#define CHARACTER_ARROW_DOWN 25
+
+// Define where the rectanglular game board should be
+#define BOARD_BOUND_LEFT 1
+#define BOARD_BOUND_TOP 1
+#define BOARD_BOUND_RIGHT 113
+#define BOARD_BOUND_BOTTOM 62
+
+/*--------------------------------------------------------------------------------------------
   display_init()
     LCD display initialisation for Adafruit SSD1306 128x64 LCD screen.
     Called from Arduino setup() function.
-  --------------------------------------------------------------------------------------*/
+  ------------------------------------------------------------------------------------------*/
 void display_init(void)
 {
   Serial.begin(9600);
@@ -89,23 +113,30 @@ void display_init(void)
 }
 
 
-/*--------------------------------------------------------------------------------------
+/*--------------------------------------------------------------------------------------------
   display_draw_new()
     Descriptions:
-      Draws snake to LCD screen at the given location. Takes the updated x and y coordinates as well as a direction.
-      Fills in the four pixels at the corresponding location as well as the pixels on the opposite side of the direction
-      given to link the previous location to the current location.
-      Can also print a square at any given coordinate for starting positions or fruit by passing the NONE direction.
+      Draws snake to LCD screen at the given location. Takes the updated x and y coordinates
+      as well as a direction. Fills in the four pixels at the corresponding location as well
+      as the pixels on the opposite side of the direction given to link the previous location
+      to the current location.
+      Can also print a square at any given coordinate for starting positions or fruit by
+      passing the NONE direction.
     Inputs:
       X and Y coordinates to be printed.
       Direction which the snake travelled to get to the current position.
     Outputs:
       Prints snake to LCD screen.
-  --------------------------------------------------------------------------------------*/
+  ------------------------------------------------------------------------------------------*/
 void display_draw_new(struct coordinates player)
 {
-  // Check if passed coordinates are out of bounds
-  if (( X_COORD_LIMIT < player.x_coord ) || ( Y_COORD_LIMIT < player.y_coord ))
+  // Check if passed coordinates are out of bounds.
+  // Limits for x are 0 inclusive and X_COORD_LIMIT exclusive, limits for y are 0 inclusive
+  // and Y_COORD_LIMIT exclusive.
+  // -1 coordinate indicates to the player they have run into the left or upper boundary,
+  // allow this coordinate but no further.
+  if (( -1 > player.x_coord ) || ( -1 > player.y_coord ) ||
+      ( X_COORD_LIMIT < player.x_coord ) || ( Y_COORD_LIMIT < player.y_coord ))
   {
     //Coordinates are out of bounds, return to main function
 #ifdef DEBUG
@@ -149,28 +180,26 @@ void display_draw_new(struct coordinates player)
       break;
     case NONE:
     default:
-      // Used for fruits to be collected and initial starting positions which do not require padding
+      // Used for fruits to be collected and initial starting positions which do not require
+      // padding
       break;
   }
   display.display();
 }
 
-#define SCORE_LOCATION_X 115
-#define SCORE_LOCATION_Y 5
-#define HEX_ASCII_OFFSET 0x30
-#define SCORE_WIDTH 11
-#define SCORE_HEIGHT 7
-/*--------------------------------------------------------------------------------------
+
+/*--------------------------------------------------------------------------------------------
   display_print_score()
     Descriptions:
-      Prints the current player score on the right side of the screen. The old score must first be cleared
-      by printing a solid black rectangle at the specified location. The number is then divided into the tens
-      and singles portions and printed by adding an ASCII offset to the number.
+      Prints the current player score on the right side of the screen. The old score must
+      first be cleared by printing a solid black rectangle at the specified location. The
+      number is then divided into the tens and singles portions and printed by adding an ASCII
+      offset to the number.
     Inputs:
       Integer score to be printed.
     Outputs:
       Prints passed score to LCD screen at defined location.
-  --------------------------------------------------------------------------------------*/
+  ------------------------------------------------------------------------------------------*/
 void display_print_score(int8_t score)
 {
   //If greater than 99 or below zero, display 99 and 0 respectively.
@@ -196,50 +225,85 @@ void display_print_score(int8_t score)
 }
 
 
-/*--------------------------------------------------------------------------------------
+/*--------------------------------------------------------------------------------------------
+  display_print_direction()
+    Descriptions:
+      Prints the user inputted direction to the right of the screen below the score.
+      Called from snake_game() function to set default direction, and then called from
+      get_direction_input() each time a valid debounced input is detected.
+    Inputs:
+      Enumerated direction to be printed indicating user selected direction.
+    Outputs:
+      Prints inputted direction to screen at direction location.
+  ------------------------------------------------------------------------------------------*/
+void display_print_direction(enum snake_direction input_direction)
+{
+  // Clear previous direction 
+  display.fillRect(DIRECTION_LOCATION_X, DIRECTION_LOCATION_Y,
+                    DIRECTION_WIDTH,DIRECTION_HEIGHT, BLACK);
+  // Format character size and location
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(DIRECTION_LOCATION_X, DIRECTION_LOCATION_Y);
+  // Print corresponding directional arrow based on given 
+  switch (input_direction)
+  {
+    case LEFT:
+      display.write(CHARACTER_ARROW_LEFT);      // Left arrow
+      break;
+    case RIGHT:
+      display.write(CHARACTER_ARROW_RIGHT);      // Right arrow
+      break;
+    case UP:
+      display.write(CHARACTER_ARROW_UP);      // Up arrow
+      break;
+    case DOWN:
+      display.write(CHARACTER_ARROW_DOWN);      // Down arrow
+      break;
+  }
+  display.display();
+}
+
+
+
+/*--------------------------------------------------------------------------------------------
   display_clear_space()
     Descriptions:
       Clears the passed board location. Called by cleanup function to remove old spaces.
-      Prints a black filled rectangle over the central pixels, the outer connecting pixels, and the
-      corner padding pixels.
+      Prints a black filled rectangle over the central pixels, the outer connecting pixels,
+      and the corner padding pixels.
     Inputs:
       X and Y coordinates of space to be cleared.
     Outputs:
       Changes pixels on LCD screen at given coordinate location to black.
-  --------------------------------------------------------------------------------------*/
-void display_draw_board(int8_t x_arg, int8_t y_arg)
+  ------------------------------------------------------------------------------------------*/
+void display_clear_space(int8_t x_arg, int8_t y_arg)
 {
   uint8_t x_coord = coord_to_pixel(x_arg);
   uint8_t y_coord = coord_to_pixel(y_arg);
   // Coordinate-1 is used to set starting location for rectangle in top left padding pixel
-  display.drawRect(x_coord - 1, y_coord - 1, 4, 4, BLACK);
+  display.fillRect(x_coord - 1, y_coord - 1, 4, 4, BLACK);
   display.display();
 }
 
 
-// Define where the rectanglular game board should be
-#define BOARD_BOUND_LEFT 1
-#define BOARD_BOUND_TOP 1
-#define BOARD_BOUND_RIGHT 113
-#define BOARD_BOUND_BOTTOM 62
-
-
-/*--------------------------------------------------------------------------------------
+/*--------------------------------------------------------------------------------------------
   display_draw_board()
     Clears the display and prints a blank game board.
-  --------------------------------------------------------------------------------------*/
+  ------------------------------------------------------------------------------------------*/
 void display_draw_board(void)
 {
   display.clearDisplay();
-  display.drawRect(BOARD_BOUND_LEFT, BOARD_BOUND_TOP, BOARD_BOUND_RIGHT, BOARD_BOUND_BOTTOM, WHITE);
+  display.drawRect(BOARD_BOUND_LEFT, BOARD_BOUND_TOP,
+                  BOARD_BOUND_RIGHT, BOARD_BOUND_BOTTOM, WHITE);
   display.display();
 }
 
-/*--------------------------------------------------------------------------------------
+/*--------------------------------------------------------------------------------------------
   coord_to_pixel()
     Takes a coordinate integer and returns the corresponding location of the top-left pixel
     Pixels have four spaces padding on the top and left of the screen and are 3 pixels apart.
-  --------------------------------------------------------------------------------------*/
+  ------------------------------------------------------------------------------------------*/
 uint8_t coord_to_pixel(int8_t coord)
 {
   return ( coord * 3 ) + 4;
